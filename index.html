@@ -1,0 +1,1434 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta name="theme-color" content="#050507">
+    <title>KЕҢІСТІК | Киіз үй феномені</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Manrope:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+    
+    <style>
+        :root {
+            --void: #050507;
+            --void-light: #0f0f14;
+            --starlight: #EAEAEA;
+            --goldenrod: #D4AF37;
+            --gold-light: #F9E5BC;
+            --cyan: rgba(0, 255, 255, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-surface: rgba(15, 15, 20, 0.6);
+            --font-serif: 'Cormorant Garamond', Georgia, serif;
+            --font-sans: 'Manrope', -apple-system, sans-serif;
+            --shadow-gold: 0 0 30px rgba(212, 175, 55, 0.3);
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+        
+        body {
+            background: var(--void);
+            color: var(--starlight);
+            font-family: var(--font-sans);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+        
+        ::selection { background: var(--goldenrod); color: var(--void); }
+        
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: var(--void); }
+        ::-webkit-scrollbar-thumb { background: var(--goldenrod); border-radius: 2px; }
+
+        /* ===== CURSOR ===== */
+        .cursor-dot, .cursor-outline {
+            position: fixed;
+            pointer-events: none;
+            z-index: 99999;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .cursor-dot { width: 4px; height: 4px; background: var(--goldenrod); }
+        .cursor-outline {
+            width: 40px; height: 40px;
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+        }
+        body.hovering .cursor-outline {
+            width: 70px; height: 70px;
+            background: rgba(212, 175, 55, 0.05);
+            border-color: var(--goldenrod);
+            backdrop-filter: blur(2px);
+        }
+        body.dragging .cursor-outline {
+            width: 90px; height: 90px;
+            border-color: var(--cyan);
+            background: rgba(0, 255, 255, 0.05);
+        }
+        body.dragging .cursor-dot { background: cyan; }
+        
+        @media (hover: none), (pointer: coarse) {
+            .cursor-dot, .cursor-outline { display: none !important; }
+        }
+        @media (hover: hover) and (pointer: fine) {
+            body { cursor: none; }
+        }
+
+        /* ===== NOISE & EFFECTS ===== */
+        .noise-overlay {
+            position: fixed; inset: 0; z-index: 9998;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+            pointer-events: none;
+            mix-blend-mode: overlay;
+        }
+        
+        .vignette {
+            position: fixed; inset: 0; z-index: 9997;
+            background: radial-gradient(ellipse at center, transparent 0%, rgba(5,5,7,0.4) 100%);
+            pointer-events: none;
+        }
+
+        /* ===== PRELOADER ===== */
+        .preloader {
+            position: fixed; inset: 0; z-index: 100000;
+            background: #000;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center; gap: 2rem;
+        }
+        .preloader-logo {
+            font-family: var(--font-serif);
+            font-size: clamp(2rem, 6vw, 4rem);
+            font-style: italic; font-weight: 300;
+            color: var(--starlight);
+        }
+        .preloader-bar {
+            width: min(200px, 50vw); height: 1px;
+            background: rgba(255,255,255,0.1);
+            overflow: hidden;
+        }
+        .preloader-progress {
+            height: 100%; width: 0%;
+            background: linear-gradient(90deg, var(--goldenrod), cyan);
+        }
+        .preloader-counter {
+            font-size: 0.75rem; letter-spacing: 0.3em;
+            color: rgba(255,255,255,0.4);
+        }
+
+        /* ===== 3D CANVAS (CINEMATIC BACKGROUND) ===== */
+        #canvas-container {
+            position: fixed; inset: 0; z-index: 1;
+            opacity: 0;
+        }
+        #canvas-container canvas { width: 100%; height: 100%; }
+
+        /* ===== NAVIGATION ===== */
+        .nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+            padding: 1.5rem 2rem;
+            display: flex; justify-content: space-between; align-items: center;
+            mix-blend-mode: difference;
+            opacity: 0;
+        }
+        .nav-logo {
+            font-family: var(--font-serif);
+            font-size: 1.25rem; font-style: italic;
+            color: var(--starlight); text-decoration: none;
+        }
+        .nav-links { display: flex; gap: 2rem; }
+        .nav-link {
+            font-size: 0.65rem; letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.6); text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        .nav-link:hover { color: var(--goldenrod); }
+        @media (max-width: 768px) {
+            .nav { padding: 1rem; }
+            .nav-links { display: none; }
+        }
+
+        /* ===== COMMAND DOCK ===== */
+        .dock {
+            position: fixed; bottom: 1.5rem; left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex; gap: 0.5rem; padding: 0.5rem;
+            background: var(--glass-surface);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 9999px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            opacity: 0;
+            transition: transform 0.5s ease;
+        }
+        body.scrolling-down .dock { transform: translateX(-50%) translateY(150%); }
+        
+        .dock-btn {
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            display: grid; place-items: center;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.5);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .dock-btn:hover, .dock-btn.active {
+            background: rgba(212, 175, 55, 0.1);
+            border-color: var(--goldenrod);
+            color: var(--goldenrod);
+            transform: scale(1.1);
+        }
+        .dock-divider {
+            width: 1px; height: 24px;
+            background: rgba(255,255,255,0.1);
+            margin: auto 0.25rem;
+        }
+        
+        @media (max-width: 640px) {
+            .dock { padding: 0.4rem; gap: 0.3rem; }
+            .dock-btn { width: 38px; height: 38px; font-size: 0.9rem; }
+        }
+
+        /* ===== CONTENT ===== */
+        .content {
+            position: relative; z-index: 10;
+            pointer-events: none;
+        }
+        .content > * { pointer-events: auto; }
+
+        /* ===== HERO ===== */
+        .hero {
+            min-height: 100vh; min-height: 100dvh;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            text-align: center;
+            padding: 2rem;
+            position: relative;
+        }
+        .hero-overline {
+            display: inline-flex; align-items: center; gap: 0.75rem;
+            font-size: 0.7rem; letter-spacing: 0.5em;
+            text-transform: uppercase; color: var(--goldenrod);
+            margin-bottom: 1rem;
+            opacity: 0; transform: translateY(20px);
+        }
+        .hero-overline::before {
+            content: ''; width: 8px; height: 8px;
+            background: var(--goldenrod); border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.3); }
+        }
+        .hero-title {
+            font-family: var(--font-serif);
+            font-size: clamp(4rem, 15vw, 16rem);
+            font-weight: 300; line-height: 0.85;
+            letter-spacing: -0.03em;
+            overflow: hidden;
+        }
+        .hero-line {
+            display: block;
+            opacity: 0; transform: translateY(100%);
+        }
+        .hero-line-1 { font-style: italic; color: var(--starlight); }
+        .hero-line-2 { color: var(--goldenrod); mix-blend-mode: overlay; }
+        
+        .hero-subtitle {
+            margin-top: 2rem;
+            font-size: 0.9rem; color: rgba(255,255,255,0.5);
+            max-width: 400px;
+            opacity: 0; transform: translateY(20px);
+        }
+        
+        .hero-scroll {
+            position: absolute; bottom: 2rem;
+            display: flex; flex-direction: column;
+            align-items: center; gap: 0.5rem;
+            opacity: 0;
+        }
+        .hero-scroll-text {
+            font-size: 9px; letter-spacing: 0.3em;
+            text-transform: uppercase; color: rgba(255,255,255,0.3);
+        }
+        .hero-scroll-line {
+            width: 1px; height: 40px;
+            background: linear-gradient(to bottom, var(--goldenrod), transparent);
+            animation: scrollPulse 2s infinite;
+        }
+        @keyframes scrollPulse {
+            0%, 100% { transform: scaleY(1); opacity: 1; }
+            50% { transform: scaleY(0.5); opacity: 0.5; }
+        }
+
+        /* ===== SECTIONS ===== */
+        .section {
+            min-height: 100vh;
+            padding: clamp(4rem, 10vw, 8rem) clamp(1.5rem, 5vw, 4rem);
+            display: flex; align-items: center;
+        }
+        .section-inner {
+            max-width: 1100px; margin: 0 auto; width: 100%;
+        }
+        
+        .section-overline {
+            display: inline-flex; align-items: center; gap: 1rem;
+            font-size: 0.65rem; letter-spacing: 0.4em;
+            text-transform: uppercase; color: var(--goldenrod);
+            margin-bottom: 1rem;
+        }
+        .section-overline::before {
+            content: ''; width: 30px; height: 1px;
+            background: var(--goldenrod);
+        }
+        .section-overline.cyan { color: var(--cyan); }
+        .section-overline.cyan::before { background: cyan; }
+        
+        .section-title {
+            font-family: var(--font-serif);
+            font-size: clamp(2.5rem, 8vw, 6rem);
+            font-weight: 300; line-height: 1;
+        }
+        .section-title em { font-style: italic; color: var(--goldenrod); }
+        .section-title em.cyan { color: cyan; }
+
+        /* ===== GLASS PANEL ===== */
+        .glass-panel {
+            background: var(--glass-surface);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: clamp(2rem, 4vw, 3rem);
+        }
+
+        /* ===== PHILOSOPHY ===== */
+        .phi-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem; align-items: start;
+        }
+        @media (max-width: 900px) { .phi-grid { grid-template-columns: 1fr; } }
+        
+        .phi-text {
+            font-size: 1.1rem; color: rgba(255,255,255,0.7);
+            line-height: 1.9; margin-bottom: 2rem;
+        }
+        .phi-text strong { color: var(--starlight); }
+        
+        .phi-item {
+            display: flex; gap: 1rem;
+            padding: 1rem; border-radius: 12px;
+            transition: all 0.4s ease;
+        }
+        .phi-item:hover {
+            background: rgba(212, 175, 55, 0.05);
+            transform: translateX(8px);
+        }
+        .phi-icon {
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; flex-shrink: 0;
+        }
+        .phi-icon.gold { background: rgba(212,175,55,0.1); border: 1px solid rgba(212,175,55,0.25); }
+        .phi-icon.cyan { background: rgba(0,255,255,0.1); border: 1px solid rgba(0,255,255,0.2); }
+        .phi-icon.muted { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
+        .phi-label { font-family: var(--font-serif); font-size: 1.1rem; }
+        .phi-desc { font-size: 0.8rem; color: rgba(255,255,255,0.5); }
+        
+        .unesco-card {
+            padding: 2rem; border-radius: 16px;
+            background: linear-gradient(135deg, rgba(0,255,255,0.05), var(--void-light));
+            border: 1px solid rgba(0,255,255,0.1);
+        }
+        .unesco-badge {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.4rem 0.8rem;
+            background: rgba(0,255,255,0.15); border-radius: 100px;
+            font-size: 9px; letter-spacing: 0.15em; color: cyan;
+            margin-bottom: 1rem;
+        }
+        .unesco-title {
+            font-family: var(--font-serif);
+            font-size: clamp(1.5rem, 4vw, 2rem);
+            margin-bottom: 0.75rem;
+        }
+        .unesco-text { font-size: 0.85rem; color: rgba(255,255,255,0.6); line-height: 1.7; }
+
+        /* ===== ENGINEERING ===== */
+        .eng-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.25rem;
+        }
+        @media (max-width: 1024px) { .eng-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 600px) { .eng-grid { grid-template-columns: 1fr; } }
+        
+        .eng-card {
+            padding: 2rem; border-radius: 20px;
+            background: linear-gradient(180deg, rgba(212,175,55,0.02), var(--void-light));
+            border: 1px solid rgba(212,175,55,0.08);
+            transition: all 0.5s ease;
+        }
+        .eng-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(212,175,55,0.25);
+            box-shadow: var(--shadow-gold);
+        }
+        .eng-icon { font-size: 2rem; margin-bottom: 1rem; transition: transform 0.5s ease; }
+        .eng-card:hover .eng-icon { transform: scale(1.2) rotate(5deg); }
+        .eng-name { font-family: var(--font-serif); font-size: 1.25rem; color: var(--goldenrod); margin-bottom: 0.5rem; }
+        .eng-text { font-size: 0.8rem; color: rgba(255,255,255,0.5); line-height: 1.6; }
+
+        /* ===== FACTS ===== */
+        .facts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+        @media (max-width: 768px) { .facts-grid { grid-template-columns: 1fr; } }
+        
+        .fact-card {
+            padding: 2.5rem; border-radius: 24px;
+            background: var(--void-light);
+            border-left: 4px solid var(--goldenrod);
+            display: flex; flex-direction: column;
+            min-height: 300px;
+            transition: all 0.4s ease;
+        }
+        .fact-card:hover { transform: translateY(-4px); }
+        .fact-card.cyan { border-left-color: cyan; }
+        
+        .fact-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: auto; }
+        .fact-num {
+            font-family: var(--font-serif);
+            font-size: 4rem; font-weight: 300;
+            color: rgba(255,255,255,0.08);
+        }
+        .fact-tag {
+            padding: 0.3rem 0.75rem;
+            font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+            border-radius: 100px;
+            background: rgba(212,175,55,0.15); color: var(--goldenrod);
+        }
+        .fact-tag.cyan { background: rgba(0,255,255,0.15); color: cyan; }
+        .fact-title { font-family: var(--font-serif); font-size: 2rem; margin-bottom: 0.5rem; }
+        .fact-text { font-size: 0.85rem; color: rgba(255,255,255,0.6); line-height: 1.7; }
+
+        /* ===== GRAMMAR ===== */
+        .grammar-header {
+            text-align: center; margin-bottom: 4rem;
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 2rem;
+        }
+        
+        .grammar-rules { max-width: 800px; margin: 0 auto; }
+        
+        .grammar-rule {
+            padding: 2rem 0;
+            border-bottom: 1px solid var(--glass-border);
+            cursor: pointer;
+            transition: all 0.4s ease;
+        }
+        .grammar-rule:hover { padding-left: 1rem; }
+        
+        .grammar-rule-header { display: flex; align-items: baseline; gap: 1.5rem; }
+        .grammar-rule-num {
+            font-family: var(--font-serif);
+            font-size: 1.5rem; color: cyan; opacity: 0.5;
+            transition: opacity 0.3s ease;
+        }
+        .grammar-rule:hover .grammar-rule-num { opacity: 1; }
+        .grammar-rule-title {
+            font-family: var(--font-serif);
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            transition: color 0.3s ease;
+        }
+        .grammar-rule:hover .grammar-rule-title { color: cyan; }
+        
+        .grammar-rule-content {
+            max-height: 0; overflow: hidden;
+            opacity: 0;
+            padding-left: 3.5rem;
+            transition: all 0.5s ease;
+        }
+        .grammar-rule:hover .grammar-rule-content {
+            max-height: 200px;
+            opacity: 1;
+            margin-top: 1rem;
+        }
+        .grammar-rule-text { font-size: 0.9rem; color: rgba(255,255,255,0.6); margin-bottom: 0.75rem; }
+        .grammar-rule-code {
+            font-family: var(--font-serif);
+            font-size: 1.5rem; color: var(--goldenrod);
+        }
+
+        /* ===== FOOTER ===== */
+        .footer {
+            min-height: 60vh;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            text-align: center;
+            position: relative;
+            padding: 4rem 2rem;
+        }
+        .footer-bg {
+            position: absolute; inset: 0;
+            font-family: var(--font-serif);
+            font-size: clamp(15vw, 20vw, 25vw);
+            color: rgba(255,255,255,0.02);
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none; user-select: none;
+            overflow: hidden;
+        }
+        .footer-content { position: relative; z-index: 1; }
+        .footer-text {
+            font-size: 1rem; color: rgba(255,255,255,0.6);
+            margin-bottom: 2rem;
+        }
+        .footer-btn {
+            padding: 1rem 2.5rem;
+            font-family: var(--font-sans);
+            font-size: 0.7rem; letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--goldenrod);
+            background: transparent;
+            border: 1px solid rgba(212,175,55,0.3);
+            border-radius: 100px;
+            cursor: pointer;
+            transition: all 0.4s ease;
+        }
+        .footer-btn:hover {
+            background: var(--goldenrod);
+            color: var(--void);
+        }
+
+        /* ===== REVEAL ANIMATIONS ===== */
+        .reveal { opacity: 0; transform: translateY(50px); }
+        .reveal-left { opacity: 0; transform: translateX(-50px); }
+        .reveal-right { opacity: 0; transform: translateX(50px); }
+        .reveal-scale { opacity: 0; transform: scale(0.9); }
+    </style>
+</head>
+<body>
+    <!-- Effects -->
+    <div class="noise-overlay"></div>
+    <div class="vignette"></div>
+    
+    <!-- Cursor -->
+    <div class="cursor-dot"></div>
+    <div class="cursor-outline"></div>
+
+    <!-- Preloader -->
+    <div class="preloader" id="preloader">
+        <div class="preloader-logo">Кеңістік</div>
+        <div class="preloader-bar">
+            <div class="preloader-progress" id="preloaderProgress"></div>
+        </div>
+        <div class="preloader-counter" id="preloaderCounter">0%</div>
+    </div>
+
+    <!-- 3D Canvas (CINEMATIC BACKGROUND) -->
+    <div id="canvas-container">
+        <canvas id="canvas3d"></canvas>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="nav" id="nav">
+        <a href="#" class="nav-logo hover-trigger">Кеңістік</a>
+        <div class="nav-links">
+            <a href="#philosophy" class="nav-link hover-trigger">Философия</a>
+            <a href="#engineering" class="nav-link hover-trigger">Инженерия</a>
+            <a href="#grammar" class="nav-link hover-trigger">Грамматика</a>
+        </div>
+    </nav>
+
+    <!-- Command Dock -->
+    <div class="dock" id="dock">
+        <button class="dock-btn active hover-trigger" id="btnAssemble" onclick="showAssembled()" title="Жиналған">⬡</button>
+        <button class="dock-btn hover-trigger" id="btnExplode" onclick="showExploded()" title="Бөлшектер">⬢</button>
+        <div class="dock-divider"></div>
+        <button class="dock-btn hover-trigger" onclick="focusShanyrak()" title="Шаңырақ">◉</button>
+        <button class="dock-btn hover-trigger" onclick="focusKerege()" title="Кереге">▣</button>
+        <div class="dock-divider"></div>
+        <button class="dock-btn hover-trigger" onclick="toggleLight()" id="btnLight" title="Жарық">☀</button>
+        <button class="dock-btn active hover-trigger" onclick="toggleSpin()" id="btnSpin" title="Айналу">↻</button>
+    </div>
+
+    <!-- Content -->
+    <main class="content">
+        <!-- HERO -->
+        <section class="hero" id="hero">
+            <div class="hero-overline">ЮНЕСКО мұрасы</div>
+            <h1 class="hero-title">
+                <span class="hero-line hero-line-1">KЕҢІСТІК</span>
+                <span class="hero-line hero-line-2">ПЕН СӨЗ</span>
+            </h1>
+            <p class="hero-subtitle">Киіз үй инженерлігі және қазақ тілінің архитектурасы</p>
+            <div class="hero-scroll">
+                <span class="hero-scroll-text">Scroll</span>
+                <div class="hero-scroll-line"></div>
+            </div>
+        </section>
+
+        <!-- PHILOSOPHY -->
+        <section class="section" id="philosophy">
+            <div class="section-inner">
+                <div class="phi-grid">
+                    <div class="glass-panel reveal-left">
+                        <span class="section-overline">Философия</span>
+                        <h2 class="section-title" style="font-size: clamp(2.5rem, 6vw, 4rem); margin-bottom: 1.5rem;">
+                            Микрокосм<br><span style="color: rgba(255,255,255,0.2); font-style: italic;">Моделі</span>
+                        </h2>
+                        <p class="phi-text">
+                            Көшпенділер киіз үйді жай ғана баспана емес, <strong>ғаламның кішірейтілген моделі</strong> деп қарастырған.
+                        </p>
+                        
+                        <div class="phi-item hover-trigger">
+                            <div class="phi-icon gold">☀</div>
+                            <div>
+                                <h4 class="phi-label">Шаңырақ</h4>
+                                <p class="phi-desc">Күннің символы, аспан әлемі</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="reveal-right" style="padding-top: 4rem;">
+                        <div class="phi-item hover-trigger" style="margin-bottom: 2rem;">
+                            <div class="phi-icon cyan">⬡</div>
+                            <div>
+                                <h4 class="phi-label">Кереге мен Уық</h4>
+                                <p class="phi-desc">Ортаңғы әлем, адамзат пен табиғат</p>
+                            </div>
+                        </div>
+                        
+                        <div class="phi-item hover-trigger" style="margin-bottom: 2rem;">
+                            <div class="phi-icon muted">▭</div>
+                            <div>
+                                <h4 class="phi-label">Табалдырық</h4>
+                                <p class="phi-desc">Екі әлемнің шекарасы</p>
+                            </div>
+                        </div>
+                        
+                        <div class="unesco-card reveal">
+                            <div class="unesco-badge">🏛 UNESCO</div>
+                            <h3 class="unesco-title">Мәдени мұра</h3>
+                            <p class="unesco-text">«Киіз үйді жасау дәстүрлері» — Адамзаттың материалдық емес мұрасы.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ENGINEERING -->
+        <section class="section" id="engineering">
+            <div class="section-inner">
+                <header style="text-align: center; margin-bottom: 4rem;" class="reveal">
+                    <span class="section-overline" style="justify-content: center;">Инженерия</span>
+                    <h2 class="section-title">Гениалды <em>Құрылым</em></h2>
+                </header>
+                
+                <div class="eng-grid">
+                    <div class="eng-card reveal-scale hover-trigger">
+                        <span class="eng-icon">🔩</span>
+                        <h4 class="eng-name">Шегесіз</h4>
+                        <p class="eng-text">Бірде-бір темір шеге қолданылмайды. Тек қайыс және жүн бау.</p>
+                    </div>
+                    <div class="eng-card reveal-scale hover-trigger">
+                        <span class="eng-icon">🌀</span>
+                        <h4 class="eng-name">Аэродинамика</h4>
+                        <p class="eng-text">Дөңгелек пішін қатты дауылға төтеп береді.</p>
+                    </div>
+                    <div class="eng-card reveal-scale hover-trigger">
+                        <span class="eng-icon">🌡</span>
+                        <h4 class="eng-name">Термо</h4>
+                        <p class="eng-text">Жазда салқын, қыста жылы. Табиғи климат-контроль.</p>
+                    </div>
+                    <div class="eng-card reveal-scale hover-trigger">
+                        <span class="eng-icon">🏔</span>
+                        <h4 class="eng-name">Сейсмика</h4>
+                        <p class="eng-text">Керегенің құрылымы жер сілкінісіне төзімді.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FACTS -->
+        <section class="section" id="facts">
+            <div class="section-inner">
+                <header style="margin-bottom: 3rem;" class="reveal">
+                    <span class="section-overline">WOW-Фактілер</span>
+                    <h2 class="section-title">Білесіз бе?</h2>
+                </header>
+                
+                <div class="facts-grid">
+                    <div class="fact-card reveal-scale hover-trigger">
+                        <div class="fact-header">
+                            <span class="fact-num">01</span>
+                            <span class="fact-tag">Уақыт</span>
+                        </div>
+                        <h3 class="fact-title">1 Сағат</h3>
+                        <p class="fact-text">Тәжірибелі 3-4 адам киіз үйді небәрі 1 сағатта тігіп бітіреді.</p>
+                    </div>
+                    
+                    <div class="fact-card cyan reveal-scale hover-trigger">
+                        <div class="fact-header">
+                            <span class="fact-num">02</span>
+                            <span class="fact-tag cyan">Астрономия</span>
+                        </div>
+                        <h3 class="fact-title">Күн Сағаты</h3>
+                        <p class="fact-text">Шаңырақтан түскен сәулеге қарап уақытты анықтаған.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- GRAMMAR -->
+        <section class="section" id="grammar">
+            <div class="section-inner">
+                <header class="grammar-header reveal">
+                    <h2 class="section-title" style="font-size: clamp(3rem, 10vw, 7rem);">
+                        Тырнақша<span style="color: cyan;">.</span>
+                    </h2>
+                    <p style="font-size: 1.1rem; color: rgba(255,255,255,0.4); margin-top: 1rem;">
+                        Ойдың сәулеті және грамматикалық инженерлік.
+                    </p>
+                </header>
+                
+                <div class="grammar-rules">
+                    <div class="grammar-rule reveal hover-trigger">
+                        <div class="grammar-rule-header">
+                            <span class="grammar-rule-num">01</span>
+                            <h3 class="grammar-rule-title">Француз тырнақшасы</h3>
+                        </div>
+                        <div class="grammar-rule-content">
+                            <p class="grammar-rule-text">Негізгі тырнақша. Кітаптарда, ресми құжаттарда тек осы қолданылады.</p>
+                            <code class="grammar-rule-code">«Сәулет өнері»</code>
+                        </div>
+                    </div>
+                    
+                    <div class="grammar-rule reveal hover-trigger">
+                        <div class="grammar-rule-header">
+                            <span class="grammar-rule-num">02</span>
+                            <h3 class="grammar-rule-title">Неміс тырнақшасы</h3>
+                        </div>
+                        <div class="grammar-rule-content">
+                            <p class="grammar-rule-text">Ішкі тырнақша (Матрёшка принципі).</p>
+                            <code class="grammar-rule-code">«Абайдың „Қара сөздері" оқылды»</code>
+                        </div>
+                    </div>
+                    
+                    <div class="grammar-rule reveal hover-trigger">
+                        <div class="grammar-rule-header">
+                            <span class="grammar-rule-num">03</span>
+                            <h3 class="grammar-rule-title">Нүкте ережесі</h3>
+                        </div>
+                        <div class="grammar-rule-content">
+                            <p class="grammar-rule-text">Нүкте тырнақша жабылғаннан КЕЙІН қойылады.</p>
+                            <code class="grammar-rule-code" style="color: #22c55e;">...деді».</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="footer" id="footer">
+            <div class="footer-bg">MURA</div>
+            <div class="footer-content reveal">
+                <p class="footer-text">Болашақты өткеннен ізде.</p>
+                <button class="footer-btn hover-trigger" onclick="window.scrollTo({top:0, behavior:'smooth'})">
+                    Басына оралу
+                </button>
+            </div>
+        </footer>
+    </main>
+
+    <script>
+    (function() {
+        'use strict';
+        
+        // ============================================
+        // CURSOR
+        // ============================================
+        var cursorDot = document.querySelector('.cursor-dot');
+        var cursorOutline = document.querySelector('.cursor-outline');
+        var mouseX = 0, mouseY = 0, outlineX = 0, outlineY = 0;
+        
+        if (window.matchMedia('(hover: hover) and (pointer: fine)').matches && cursorDot) {
+            document.addEventListener('mousemove', function(e) {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+                cursorDot.style.left = mouseX + 'px';
+                cursorDot.style.top = mouseY + 'px';
+            });
+            
+            (function animateCursor() {
+                outlineX += (mouseX - outlineX) * 0.15;
+                outlineY += (mouseY - outlineY) * 0.15;
+                cursorOutline.style.left = outlineX + 'px';
+                cursorOutline.style.top = outlineY + 'px';
+                requestAnimationFrame(animateCursor);
+            })();
+            
+            document.querySelectorAll('.hover-trigger, a, button').forEach(function(el) {
+                el.addEventListener('mouseenter', function() { document.body.classList.add('hovering'); });
+                el.addEventListener('mouseleave', function() { document.body.classList.remove('hovering'); });
+            });
+        }
+
+        // ============================================
+        // PRELOADER
+        // ============================================
+        var loadProgress = 0;
+        var preloaderProgress = document.getElementById('preloaderProgress');
+        var preloaderCounter = document.getElementById('preloaderCounter');
+        var preloader = document.getElementById('preloader');
+        
+        (function tick() {
+            loadProgress += Math.random() * 8 + 2;
+            if (loadProgress > 100) loadProgress = 100;
+            preloaderProgress.style.width = loadProgress + '%';
+            preloaderCounter.textContent = Math.round(loadProgress) + '%';
+            if (loadProgress < 100) setTimeout(tick, 50);
+            else setTimeout(hidePreloader, 300);
+        })();
+        
+        function hidePreloader() {
+            gsap.to(preloader, {
+                yPercent: -100,
+                duration: 1.2,
+                ease: 'expo.inOut',
+                onComplete: function() {
+                    preloader.style.display = 'none';
+                    initExperience();
+                }
+            });
+        }
+
+        // ============================================
+        // INIT EXPERIENCE
+        // ============================================
+        function initExperience() {
+            gsap.to('#canvas-container', { opacity: 1, duration: 1.5 });
+            gsap.to('#nav', { opacity: 1, duration: 1, delay: 0.3 });
+            gsap.to('.hero-overline', { opacity: 1, y: 0, duration: 1, delay: 0.4 });
+            gsap.to('.hero-line', { opacity: 1, y: 0, duration: 1.5, stagger: 0.15, ease: 'power4.out', delay: 0.5 });
+            gsap.to('.hero-subtitle', { opacity: 1, y: 0, duration: 1, delay: 1 });
+            gsap.to('.hero-scroll', { opacity: 1, duration: 1, delay: 1.2 });
+            gsap.to('#dock', { opacity: 1, duration: 1, delay: 1.3 });
+            
+            initScrollAnimations();
+            initScrollSync();
+        }
+
+        // ============================================
+        // SCROLL ANIMATIONS
+        // ============================================
+        gsap.registerPlugin(ScrollTrigger);
+        
+        function initScrollAnimations() {
+            // Reveal animations
+            gsap.utils.toArray('.reveal').forEach(function(el) {
+                gsap.to(el, {
+                    opacity: 1, y: 0, duration: 1, ease: 'power3.out',
+                    scrollTrigger: { trigger: el, start: 'top 85%' }
+                });
+            });
+            gsap.utils.toArray('.reveal-left').forEach(function(el) {
+                gsap.to(el, {
+                    opacity: 1, x: 0, duration: 1, ease: 'power3.out',
+                    scrollTrigger: { trigger: el, start: 'top 85%' }
+                });
+            });
+            gsap.utils.toArray('.reveal-right').forEach(function(el) {
+                gsap.to(el, {
+                    opacity: 1, x: 0, duration: 1, ease: 'power3.out',
+                    scrollTrigger: { trigger: el, start: 'top 85%' }
+                });
+            });
+            gsap.utils.toArray('.reveal-scale').forEach(function(el, i) {
+                gsap.to(el, {
+                    opacity: 1, scale: 1, duration: 0.8, delay: i * 0.1, ease: 'power3.out',
+                    scrollTrigger: { trigger: el, start: 'top 88%' }
+                });
+            });
+            
+            // Hide dock on scroll down
+            var lastScroll = 0;
+            window.addEventListener('scroll', function() {
+                var currentScroll = window.pageYOffset;
+                if (currentScroll > lastScroll && currentScroll > 100) {
+                    document.body.classList.add('scrolling-down');
+                } else {
+                    document.body.classList.remove('scrolling-down');
+                }
+                lastScroll = currentScroll;
+            });
+        }
+
+        // ============================================
+        // SCROLL-SYNCED CAMERA (CINEMATIC)
+        // ============================================
+        function initScrollSync() {
+            // Hero -> default view
+            ScrollTrigger.create({
+                trigger: '#hero',
+                start: 'top top',
+                end: 'bottom center',
+                onEnter: function() { cameraToHero(); },
+                onEnterBack: function() { cameraToHero(); }
+            });
+            
+            // Philosophy -> side angle, yurt moves left
+            ScrollTrigger.create({
+                trigger: '#philosophy',
+                start: 'top center',
+                end: 'bottom center',
+                onEnter: function() { cameraToPhilosophy(); },
+                onEnterBack: function() { cameraToPhilosophy(); }
+            });
+            
+            // Engineering -> exploded view, wider angle
+            ScrollTrigger.create({
+                trigger: '#engineering',
+                start: 'top center',
+                end: 'bottom center',
+                onEnter: function() { cameraToEngineering(); },
+                onEnterBack: function() { cameraToEngineering(); }
+            });
+            
+            // Facts -> top-down dramatic
+            ScrollTrigger.create({
+                trigger: '#facts',
+                start: 'top center',
+                end: 'bottom center',
+                onEnter: function() { cameraToFacts(); },
+                onEnterBack: function() { cameraToFacts(); }
+            });
+            
+            // Grammar -> minimal, blurred
+            ScrollTrigger.create({
+                trigger: '#grammar',
+                start: 'top center',
+                end: 'bottom center',
+                onEnter: function() { cameraToGrammar(); },
+                onEnterBack: function() { cameraToGrammar(); }
+            });
+            
+            // Footer -> cinematic pull back
+            ScrollTrigger.create({
+                trigger: '#footer',
+                start: 'top center',
+                onEnter: function() { cameraToFooter(); },
+                onEnterBack: function() { cameraToGrammar(); }
+            });
+        }
+
+        // Camera position presets
+        function cameraToHero() {
+            if (!camera || !yurtGroup) return;
+            assembleYurt();
+            gsap.to(camera.position, { x: 10, y: 6, z: 14, duration: 2, ease: 'power3.inOut' });
+            gsap.to(yurtGroup.position, { x: 0, y: 0, z: 0, duration: 2, ease: 'power3.inOut' });
+            gsap.to(yurtGroup.rotation, { x: 0, duration: 2, ease: 'power3.inOut' });
+            setCanvasFilter('none');
+        }
+        
+        function cameraToPhilosophy() {
+            if (!camera || !yurtGroup) return;
+            assembleYurt();
+            gsap.to(camera.position, { x: 8, y: 4, z: 10, duration: 2.5, ease: 'power3.inOut' });
+            gsap.to(yurtGroup.position, { x: 3, y: 0, z: 0, duration: 2.5, ease: 'power3.inOut' });
+            setCanvasFilter('none');
+        }
+        
+        function cameraToEngineering() {
+            if (!camera || !yurtGroup) return;
+            explodeYurt();
+            gsap.to(camera.position, { x: 16, y: 12, z: 18, duration: 2.5, ease: 'power3.inOut' });
+            gsap.to(yurtGroup.position, { x: 0, y: 0, z: 0, duration: 2.5, ease: 'power3.inOut' });
+            setCanvasFilter('none');
+        }
+        
+        function cameraToFacts() {
+            if (!camera || !yurtGroup) return;
+            assembleYurt();
+            gsap.to(camera.position, { x: 0, y: 18, z: 8, duration: 2.5, ease: 'power3.inOut' });
+            gsap.to(yurtGroup.position, { x: -4, y: 0, z: 0, duration: 2.5, ease: 'power3.inOut' });
+            gsap.to(yurtGroup.rotation, { x: 0.2, duration: 2.5, ease: 'power3.inOut' });
+            setCanvasFilter('none');
+        }
+        
+        function cameraToGrammar() {
+            if (!camera || !yurtGroup) return;
+            assembleYurt();
+            gsap.to(camera.position, { x: 20, y: 5, z: 20, duration: 2.5, ease: 'power3.inOut' });
+            gsap.to(yurtGroup.position, { x: 5, y: 0, z: 0, duration: 2.5, ease: 'power3.inOut' });
+            setCanvasFilter('blur(4px) brightness(0.5)');
+        }
+        
+        function cameraToFooter() {
+            if (!camera || !yurtGroup) return;
+            gsap.to(camera.position, { x: 25, y: 15, z: 25, duration: 3, ease: 'power3.inOut' });
+            gsap.to(yurtGroup.position, { x: 0, y: 0, z: 0, duration: 3, ease: 'power3.inOut' });
+            setCanvasFilter('blur(8px) brightness(0.3)');
+        }
+        
+        function setCanvasFilter(filter) {
+            var container = document.getElementById('canvas-container');
+            gsap.to(container, { filter: filter, duration: 1 });
+        }
+
+        // ============================================
+        // THREE.JS - 3D YURT
+        // ============================================
+        var scene, camera, renderer;
+        var yurtGroup, shanyrakGroup, keregeGroup, uykGroup, feltGroup, doorGroup;
+        var isDragging = false;
+        var isExploded = false;
+        var isDayMode = true;
+        var isSpinning = true;
+        
+        var YURT = {
+            keregeRadius: 3.5,
+            keregeHeight: 2,
+            shanyrakRadius: 1.2,
+            shanyrakHeight: 5,
+            uykCount: 48,
+            floorY: 0.5
+        };
+
+        function init3D() {
+            var container = document.getElementById('canvas-container');
+            var canvas = document.getElementById('canvas3d');
+
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x050507, 0.025);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+            camera.position.set(10, 6, 14);
+            camera.lookAt(0, 2.5, 0);
+
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.3;
+
+            setupLights();
+            createYurt();
+            createGround();
+            createParticles();
+            setupInteraction(container);
+            animate();
+            
+            window.addEventListener('resize', onResize);
+        }
+
+        function setupLights() {
+            scene.add(new THREE.AmbientLight(0x404060, 0.5));
+
+            var sun = new THREE.DirectionalLight(0xfff5e6, 2.2);
+            sun.position.set(10, 15, 10);
+            sun.castShadow = true;
+            sun.shadow.mapSize.width = 2048;
+            sun.shadow.mapSize.height = 2048;
+            sun.shadow.camera.near = 0.5;
+            sun.shadow.camera.far = 60;
+            sun.shadow.camera.left = -20;
+            sun.shadow.camera.right = 20;
+            sun.shadow.camera.top = 20;
+            sun.shadow.camera.bottom = -20;
+            sun.name = 'sun';
+            scene.add(sun);
+
+            var rim = new THREE.SpotLight(0x00D4FF, 1.2);
+            rim.position.set(-10, 8, -10);
+            rim.lookAt(0, 2, 0);
+            rim.name = 'rim';
+            scene.add(rim);
+            
+            var fill = new THREE.PointLight(0xD4AF37, 1, 15);
+            fill.position.set(0, 2, 0);
+            fill.name = 'fill';
+            scene.add(fill);
+        }
+
+        function createYurt() {
+            yurtGroup = new THREE.Group();
+
+            var woodMat = new THREE.MeshStandardMaterial({ color: 0x6B4423, roughness: 0.75, metalness: 0.05 });
+            var goldMat = new THREE.MeshStandardMaterial({ color: 0xD4AF37, roughness: 0.25, metalness: 0.8, emissive: 0xD4AF37, emissiveIntensity: 0.15 });
+            var feltMat = new THREE.MeshStandardMaterial({ color: 0xF5F5DC, roughness: 0.9, side: THREE.DoubleSide });
+            var redMat = new THREE.MeshStandardMaterial({ color: 0x8B0000, roughness: 0.85 });
+
+            // SHANYRAK
+            shanyrakGroup = new THREE.Group();
+            var outerRing = new THREE.Mesh(new THREE.TorusGeometry(YURT.shanyrakRadius, 0.08, 16, 48), goldMat);
+            outerRing.rotation.x = Math.PI / 2;
+            outerRing.position.y = YURT.shanyrakHeight;
+            outerRing.castShadow = true;
+            shanyrakGroup.add(outerRing);
+            var innerRing = new THREE.Mesh(new THREE.TorusGeometry(YURT.shanyrakRadius * 0.6, 0.05, 12, 32), goldMat);
+            innerRing.rotation.x = Math.PI / 2;
+            innerRing.position.y = YURT.shanyrakHeight;
+            shanyrakGroup.add(innerRing);
+            for (var i = 0; i < 8; i++) {
+                var beam = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, YURT.shanyrakRadius * 2, 8), woodMat);
+                beam.rotation.z = Math.PI / 2;
+                beam.rotation.y = (i / 8) * Math.PI * 2;
+                beam.position.y = YURT.shanyrakHeight;
+                beam.castShadow = true;
+                shanyrakGroup.add(beam);
+            }
+            var centerDeco = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), goldMat);
+            centerDeco.position.y = YURT.shanyrakHeight + 0.08;
+            shanyrakGroup.add(centerDeco);
+            yurtGroup.add(shanyrakGroup);
+
+            // UYK
+            uykGroup = new THREE.Group();
+            for (var i = 0; i < YURT.uykCount; i++) {
+                var angle = (i / YURT.uykCount) * Math.PI * 2;
+                var bX = Math.cos(angle) * YURT.keregeRadius;
+                var bY = YURT.floorY + YURT.keregeHeight;
+                var bZ = Math.sin(angle) * YURT.keregeRadius;
+                var tX = Math.cos(angle) * YURT.shanyrakRadius;
+                var tY = YURT.shanyrakHeight;
+                var tZ = Math.sin(angle) * YURT.shanyrakRadius;
+                var dx = tX - bX, dy = tY - bY, dz = tZ - bZ;
+                var length = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, length, 6), woodMat);
+                pole.position.set((bX + tX) / 2, (bY + tY) / 2, (bZ + tZ) / 2);
+                var dir = new THREE.Vector3(dx, dy, dz).normalize();
+                pole.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                pole.castShadow = true;
+                uykGroup.add(pole);
+            }
+            yurtGroup.add(uykGroup);
+
+            // KEREGE
+            keregeGroup = new THREE.Group();
+            for (var s = 0; s < 12; s++) {
+                var aStart = (s / 12) * Math.PI * 2;
+                var aEnd = ((s + 1) / 12) * Math.PI * 2;
+                for (var v = 0; v <= 3; v++) {
+                    var vAngle = aStart + (v / 3) * (aEnd - aStart);
+                    var kPole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, YURT.keregeHeight, 6), woodMat);
+                    kPole.position.set(Math.cos(vAngle) * YURT.keregeRadius, YURT.floorY + YURT.keregeHeight / 2, Math.sin(vAngle) * YURT.keregeRadius);
+                    kPole.castShadow = true;
+                    keregeGroup.add(kPole);
+                }
+                for (var d = 0; d < 6; d++) {
+                    var t = d / 6;
+                    var a1 = aStart + t * (aEnd - aStart);
+                    var a2 = aStart + (t + 0.15) * (aEnd - aStart);
+                    makeDiagonal(a1, a2, 0, 1, woodMat, keregeGroup);
+                    makeDiagonal(a2, a1, 0, 1, woodMat, keregeGroup);
+                }
+            }
+            var topRing = new THREE.Mesh(new THREE.TorusGeometry(YURT.keregeRadius, 0.04, 8, 64), woodMat);
+            topRing.rotation.x = Math.PI / 2;
+            topRing.position.y = YURT.floorY + YURT.keregeHeight;
+            keregeGroup.add(topRing);
+            var bottomRing = new THREE.Mesh(new THREE.TorusGeometry(YURT.keregeRadius, 0.04, 8, 64), woodMat);
+            bottomRing.rotation.x = Math.PI / 2;
+            bottomRing.position.y = YURT.floorY;
+            keregeGroup.add(bottomRing);
+            yurtGroup.add(keregeGroup);
+
+            // FELT
+            feltGroup = new THREE.Group();
+            var roofH = YURT.shanyrakHeight - (YURT.floorY + YURT.keregeHeight);
+            var roof = new THREE.Mesh(new THREE.ConeGeometry(YURT.keregeRadius + 0.15, roofH + 0.3, 64, 1, true), feltMat);
+            roof.position.y = YURT.floorY + YURT.keregeHeight + roofH / 2;
+            roof.castShadow = true;
+            roof.receiveShadow = true;
+            feltGroup.add(roof);
+            var wall = new THREE.Mesh(new THREE.CylinderGeometry(YURT.keregeRadius + 0.1, YURT.keregeRadius + 0.1, YURT.keregeHeight + 0.1, 64, 1, true), feltMat);
+            wall.position.y = YURT.floorY + YURT.keregeHeight / 2;
+            wall.castShadow = true;
+            wall.receiveShadow = true;
+            feltGroup.add(wall);
+            var band = new THREE.Mesh(new THREE.CylinderGeometry(YURT.keregeRadius + 0.12, YURT.keregeRadius + 0.12, 0.25, 64, 1, true), redMat);
+            band.position.y = YURT.floorY + YURT.keregeHeight;
+            feltGroup.add(band);
+            yurtGroup.add(feltGroup);
+
+            // DOOR
+            doorGroup = new THREE.Group();
+            var doorW = 0.9, doorH = 1.8;
+            var lFrame = new THREE.Mesh(new THREE.BoxGeometry(0.08, doorH, 0.08), woodMat);
+            lFrame.position.set(YURT.keregeRadius, YURT.floorY + doorH/2, -doorW/2);
+            doorGroup.add(lFrame);
+            var rFrame = new THREE.Mesh(new THREE.BoxGeometry(0.08, doorH, 0.08), woodMat);
+            rFrame.position.set(YURT.keregeRadius, YURT.floorY + doorH/2, doorW/2);
+            doorGroup.add(rFrame);
+            var tFrame = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, doorW + 0.16), woodMat);
+            tFrame.position.set(YURT.keregeRadius, YURT.floorY + doorH, 0);
+            doorGroup.add(tFrame);
+            var doorPanel = new THREE.Mesh(new THREE.BoxGeometry(0.05, doorH - 0.1, doorW - 0.1), redMat);
+            doorPanel.position.set(YURT.keregeRadius + 0.05, YURT.floorY + doorH/2, 0);
+            doorGroup.add(doorPanel);
+            var doorTrim = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.15, doorW - 0.2), goldMat);
+            doorTrim.position.set(YURT.keregeRadius + 0.06, YURT.floorY + doorH * 0.7, 0);
+            doorGroup.add(doorTrim);
+            yurtGroup.add(doorGroup);
+
+            scene.add(yurtGroup);
+        }
+
+        function makeDiagonal(a1, a2, yS, yE, mat, parent) {
+            var x1 = Math.cos(a1) * YURT.keregeRadius, z1 = Math.sin(a1) * YURT.keregeRadius;
+            var y1 = YURT.floorY + YURT.keregeHeight * yS;
+            var x2 = Math.cos(a2) * YURT.keregeRadius, z2 = Math.sin(a2) * YURT.keregeRadius;
+            var y2 = YURT.floorY + YURT.keregeHeight * yE;
+            var dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
+            var len = Math.sqrt(dx*dx + dy*dy + dz*dz);
+            if (len < 0.1) return;
+            var diagBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, len, 4), mat);
+            diagBeam.position.set((x1+x2)/2, (y1+y2)/2, (z1+z2)/2);
+            diagBeam.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), new THREE.Vector3(dx,dy,dz).normalize());
+            parent.add(diagBeam);
+        }
+
+        function createGround() {
+            var ground = new THREE.Mesh(
+                new THREE.CircleGeometry(40, 64),
+                new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.9 })
+            );
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+            
+            var ring = new THREE.Mesh(
+                new THREE.RingGeometry(YURT.keregeRadius + 0.5, YURT.keregeRadius + 0.6, 64),
+                new THREE.MeshBasicMaterial({ color: 0xD4AF37, transparent: true, opacity: 0.25, side: THREE.DoubleSide })
+            );
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.y = 0.02;
+            scene.add(ring);
+        }
+
+        function createParticles() {
+            var geo = new THREE.BufferGeometry();
+            var pos = [];
+            for (var i = 0; i < 1500; i++) {
+                pos.push((Math.random() - 0.5) * 60, Math.random() * 25, (Math.random() - 0.5) * 60);
+            }
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+            var mat = new THREE.PointsMaterial({ color: 0xD4AF37, size: 0.04, transparent: true, opacity: 0.25 });
+            var pts = new THREE.Points(geo, mat);
+            pts.name = 'dust';
+            scene.add(pts);
+        }
+
+        function setupInteraction(container) {
+            var prevX = 0, prevY = 0;
+            var isTouching = false;
+
+            container.addEventListener('mousedown', function(e) {
+                isDragging = true;
+                prevX = e.clientX;
+                prevY = e.clientY;
+                document.body.classList.add('dragging');
+            });
+
+            window.addEventListener('mouseup', function() {
+                if (isDragging) {
+                    isDragging = false;
+                    document.body.classList.remove('dragging');
+                }
+            });
+
+            container.addEventListener('mousemove', function(e) {
+                if (isDragging) {
+                    var dX = e.clientX - prevX;
+                    var dY = e.clientY - prevY;
+                    yurtGroup.rotation.y += dX * 0.005;
+                    yurtGroup.rotation.x = Math.max(-0.3, Math.min(0.3, yurtGroup.rotation.x + dY * 0.003));
+                    prevX = e.clientX;
+                    prevY = e.clientY;
+                }
+            });
+
+            container.addEventListener('touchstart', function(e) {
+                if (e.touches.length === 1) {
+                    isTouching = true;
+                    isDragging = true;
+                    prevX = e.touches[0].clientX;
+                    prevY = e.touches[0].clientY;
+                    document.body.classList.add('dragging');
+                }
+            }, { passive: true });
+
+            container.addEventListener('touchmove', function(e) {
+                if (isTouching && e.touches.length === 1) {
+                    var dX = e.touches[0].clientX - prevX;
+                    var dY = e.touches[0].clientY - prevY;
+                    yurtGroup.rotation.y += dX * 0.005;
+                    yurtGroup.rotation.x = Math.max(-0.2, Math.min(0.2, yurtGroup.rotation.x + dY * 0.002));
+                    prevX = e.touches[0].clientX;
+                    prevY = e.touches[0].clientY;
+                }
+            }, { passive: true });
+
+            container.addEventListener('touchend', function() {
+                isTouching = false;
+                isDragging = false;
+                document.body.classList.remove('dragging');
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (isSpinning && !isDragging) {
+                yurtGroup.rotation.y += 0.001;
+            }
+            
+            var dust = scene.getObjectByName('dust');
+            if (dust) {
+                dust.rotation.y -= 0.0003;
+                dust.position.y = Math.sin(Date.now() * 0.0001) * 0.3;
+            }
+
+            if (shanyrakGroup && !isExploded) {
+                shanyrakGroup.position.y = Math.sin(Date.now() * 0.001) * 0.015;
+            }
+
+            camera.lookAt(0, 2.5, 0);
+            renderer.render(scene, camera);
+        }
+
+        function onResize() {
+            var container = document.getElementById('canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // ============================================
+        // YURT STATES
+        // ============================================
+        function assembleYurt() {
+            if (!shanyrakGroup) return;
+            isExploded = false;
+            gsap.to(shanyrakGroup.position, { x: 0, y: 0, z: 0, duration: 1.5, ease: 'power3.inOut' });
+            gsap.to(uykGroup.position, { x: 0, y: 0, z: 0, duration: 1.5, ease: 'power3.inOut' });
+            gsap.to(keregeGroup.position, { x: 0, y: 0, z: 0, duration: 1.5, ease: 'power3.inOut' });
+            gsap.to(feltGroup.position, { x: 0, y: 0, z: 0, duration: 1.5, ease: 'power3.inOut' });
+            gsap.to(doorGroup.position, { x: 0, y: 0, z: 0, duration: 1.5, ease: 'power3.inOut' });
+            feltGroup.traverse(function(c) {
+                if (c.material) {
+                    c.material.transparent = false;
+                    gsap.to(c.material, { opacity: 1, duration: 1 });
+                }
+            });
+        }
+        
+        function explodeYurt() {
+            if (!shanyrakGroup) return;
+            isExploded = true;
+            gsap.to(shanyrakGroup.position, { y: 4.5, duration: 1.5, ease: 'power3.inOut' });
+            gsap.to(uykGroup.position, { y: 2.2, duration: 1.5, ease: 'power3.inOut', delay: 0.1 });
+            gsap.to(feltGroup.position, { y: -1.8, duration: 1.5, ease: 'power3.inOut', delay: 0.2 });
+            gsap.to(doorGroup.position, { x: 3.5, duration: 1.5, ease: 'power3.inOut', delay: 0.3 });
+            feltGroup.traverse(function(c) {
+                if (c.material) {
+                    c.material.transparent = true;
+                    gsap.to(c.material, { opacity: 0.12, duration: 1 });
+                }
+            });
+        }
+
+        // ============================================
+        // CONTROL FUNCTIONS (DOCK)
+        // ============================================
+        function setActiveBtn(id) {
+            if (id === 'btnAssemble' || id === 'btnExplode') {
+                document.getElementById('btnAssemble').classList.remove('active');
+                document.getElementById('btnExplode').classList.remove('active');
+            }
+            var btn = document.getElementById(id);
+            if (btn) btn.classList.add('active');
+        }
+
+        window.showAssembled = function() {
+            setActiveBtn('btnAssemble');
+            assembleYurt();
+            gsap.to(camera.position, { x: 10, y: 6, z: 14, duration: 2, ease: 'power3.inOut' });
+        };
+
+        window.showExploded = function() {
+            setActiveBtn('btnExplode');
+            explodeYurt();
+            gsap.to(camera.position, { x: 16, y: 12, z: 18, duration: 2, ease: 'power3.inOut' });
+        };
+
+        window.focusShanyrak = function() {
+            gsap.to(camera.position, { x: 2, y: 8, z: 4, duration: 2, ease: 'power3.inOut' });
+        };
+
+        window.focusKerege = function() {
+            feltGroup.traverse(function(c) {
+                if (c.material) {
+                    c.material.transparent = true;
+                    gsap.to(c.material, { opacity: 0.05, duration: 0.8 });
+                }
+            });
+            gsap.to(camera.position, { x: 7, y: 2.5, z: 7, duration: 2, ease: 'power3.inOut' });
+        };
+
+        window.toggleLight = function() {
+            isDayMode = !isDayMode;
+            var sun = scene.getObjectByName('sun');
+            var rim = scene.getObjectByName('rim');
+            var fill = scene.getObjectByName('fill');
+            var btn = document.getElementById('btnLight');
+
+            if (isDayMode) {
+                gsap.to(sun, { intensity: 2.2, duration: 1.5 });
+                gsap.to(sun.color, { r: 1, g: 0.96, b: 0.9, duration: 1.5 });
+                gsap.to(rim, { intensity: 1.2, duration: 1.5 });
+                gsap.to(fill, { intensity: 1, duration: 1.5 });
+                btn.textContent = '☀';
+            } else {
+                gsap.to(sun, { intensity: 0.1, duration: 1.5 });
+                gsap.to(sun.color, { r: 0.2, g: 0.2, b: 0.4, duration: 1.5 });
+                gsap.to(rim, { intensity: 3, duration: 1.5 });
+                gsap.to(fill, { intensity: 1.5, duration: 1.5 });
+                btn.textContent = '☾';
+            }
+        };
+
+        window.toggleSpin = function() {
+            isSpinning = !isSpinning;
+            var btn = document.getElementById('btnSpin');
+            if (isSpinning) btn.classList.add('active');
+            else btn.classList.remove('active');
+        };
+
+        // Init 3D
+        init3D();
+    })();
+    </script>
+</body>
+</html>
